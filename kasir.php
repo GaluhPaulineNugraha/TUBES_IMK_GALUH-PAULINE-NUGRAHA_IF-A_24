@@ -78,6 +78,7 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         .menu-info small { color: #999; font-size: 11px; }
         .btn-select { padding: 8px 20px; background: #2A4B2F; color: white; border: none; border-radius: 8px; cursor: pointer; }
         .btn-select:hover { background: #E8B84B; }
+        .btn-select:disabled { background: #ccc; cursor: not-allowed; }
         .menu-kategori { font-size: 16px; font-weight: 700; color: #2A4B2F; background: #f5f0e8; padding: 10px 15px; margin: 15px 0 8px 0; border-radius: 8px; border-left: 4px solid #E8B84B; }
         .empty-row td { text-align: center; color: #999; padding: 40px; }
 
@@ -123,20 +124,19 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
 <body>
     <div class="app-container">
          <aside class="sidebar">
-    <div class="sidebar-header" style="justify-content: center;">
-        <h3 style="text-align: center; width: 100%;">Resto Serba Serbi</h3>
-    </div>
-    <nav class="sidebar-nav">
-                <a href="analisis.php" class="nav-item active"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
-                <a href="kasir.php" class="nav-item"><i class="fas fa-cash-register"></i><span>Kasir</span></a>
-                <a href="stok.php" class="nav-item"><i class="fas fa-boxes"></i><span>Manajemen Stok</span></a>
+            <div class="sidebar-header" style="justify-content: center;">
+                <h3 style="text-align: center; width: 100%;">Resto Serba Serbi</h3>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="analisis.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
+                <a href="kasir.php" class="nav-item active"><i class="fas fa-cash-register"></i><span>Kasir</span></a>
+                <a href="stok.php" class="nav-item"><i class="fas fa-boxes"></i><span>Lihat Stok</span></a>
                 <a href="profil.php" class="nav-item"><i class="fas fa-user-circle"></i><span>Profil Kasir</span></a>
-
-    </nav>
-    <div class="sidebar-footer">
-        <a href="logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
-    </div>
-</aside>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+            </div>
+        </aside>
 
         <main class="main-content">
             <div class="top-bar">
@@ -199,7 +199,9 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                                 <p>Rp <?= number_format($item['harga'], 0, ',', '.') ?>,00</p>
                                 <small>Stok: <?= $item['stok'] ?></small>
                             </div>
-                            <button class="btn-select" onclick="tambahKeKeranjang(this)">PILIH</button>
+                            <button class="btn-select" onclick="tambahKeKeranjang(this)" <?= $item['stok'] <= 0 ? 'disabled' : '' ?>>
+                                <?= $item['stok'] <= 0 ? 'HABIS' : 'PILIH' ?>
+                            </button>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -235,17 +237,6 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         </div>
     </div>
 
-    <div id="confirmModal" class="modal">
-        <div class="confirm-modal">
-            <div class="confirm-header"><h3><i class="fas fa-question-circle"></i> Konfirmasi</h3></div>
-            <div class="confirm-body"><p id="confirmMsg">Apakah Anda yakin?</p></div>
-            <div class="confirm-footer">
-                <button id="confirmYes" class="btn-confirm-yes">YA</button>
-                <button id="confirmNo" class="btn-confirm-no">TIDAK</button>
-            </div>
-        </div>
-    </div>
-
     <input type="hidden" id="kodeTransaksi" value="<?= $kode_transaksi ?>">
     <input type="hidden" id="kasirId" value="<?= $_SESSION['kasir_id'] ?>">
 
@@ -266,15 +257,31 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         };
 
         function tambahKeKeranjang(btn) {
+            if (btn.disabled) {
+                alert('Menu ini sedang habis!');
+                return;
+            }
+            
             let item = btn.closest('.menu-item');
             let id = parseInt(item.dataset.id);
             let nama = item.dataset.name;
             let harga = parseInt(item.dataset.price);
             let stok = parseInt(item.dataset.stock);
             
+            // CEK STOK SAAT INI
+            if (stok <= 0) {
+                alert(`Maaf, ${nama} sedang HABIS!`);
+                btn.disabled = true;
+                btn.innerHTML = 'HABIS';
+                return;
+            }
+            
             let existing = keranjang.find(i => i.id === id);
             if (existing) {
-                if (existing.qty + 1 > stok) { alert('Stok tidak cukup!'); return; }
+                if (existing.qty + 1 > stok) { 
+                    alert(`Stok ${nama} tidak mencukupi! Tersisa ${stok}`);
+                    return; 
+                }
                 existing.qty++;
             } else {
                 keranjang.push({ id, nama, harga, qty: 1 });
@@ -302,7 +309,7 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
             for (let i = 0; i < keranjang.length; i++) {
                 let item = keranjang[i];
                 html += `<tr>
-                    <td>${item.nama}</td>
+                     <td>${item.nama}</td>
                     <td style="text-align: center;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
                             <button onclick="ubahQty(${item.id}, -1)" style="width: 30px; height: 30px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer;">-</button>
@@ -331,10 +338,10 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
             let index = keranjang.findIndex(i => i.id === id);
             if (index === -1) return;
             let item = keranjang[index];
-            let newQty = item.qty + change;
             let menuItem = document.querySelector(`.menu-item[data-id="${id}"]`);
             let maxStock = menuItem ? parseInt(menuItem.dataset.stock) : 999;
             
+            let newQty = item.qty + change;
             if (newQty <= 0) {
                 keranjang.splice(index, 1);
             } else if (newQty > maxStock) {
@@ -395,6 +402,100 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
             document.getElementById('kembalianBox').classList.remove('error');
         }
 
+        // ✅ FUNGSI CEK STOK SEBELUM BAYAR (FIX BUG)
+        async function prosesPembayaran(metode, uang = null) {
+            if (isProcessing) { alert('Proses sedang berjalan...'); return false; }
+            
+            // 🔴 CEK STOK ULANG SEBELUM PROSES PEMBAYARAN
+            let cekStokGagal = [];
+            for (let item of keranjang) {
+                let menuItem = document.querySelector(`.menu-item[data-id="${item.id}"]`);
+                let stokTersedia = menuItem ? parseInt(menuItem.dataset.stock) : 0;
+                
+                if (item.qty > stokTersedia) {
+                    cekStokGagal.push({
+                        nama: item.nama,
+                        qtyDiminta: item.qty,
+                        stokTersedia: stokTersedia
+                    });
+                }
+            }
+            
+            if (cekStokGagal.length > 0) {
+                let pesanError = "❌ Stok tidak mencukupi untuk item berikut:\n";
+                for (let item of cekStokGagal) {
+                    pesanError += `\n• ${item.nama}: butuh ${item.qty}, tersisa ${item.stokTersedia}`;
+                }
+                pesanError += "\n\nSilakan update keranjang Anda.";
+                alert(pesanError);
+                
+                for (let item of cekStokGagal) {
+                    keranjang = keranjang.filter(i => i.id !== item.id);
+                }
+                renderCart();
+                return false;
+            }
+            
+            isProcessing = true;
+            
+            let total = hitungTotal();
+            if (metode === 'cash' && (!uang || uang < total)) {
+                alert('Uang tidak cukup!');
+                isProcessing = false;
+                return false;
+            }
+            
+            let data = {
+                kode_transaksi: document.getElementById('kodeTransaksi').value,
+                id_kasir: parseInt(document.getElementById('kasirId').value),
+                tipe_order: tipeOrder,
+                subtotal: hitungSubtotal(),
+                pajak: hitungPajak(),
+                total: total,
+                metode: metode,
+                items: keranjang.map(i => ({ id: i.id, qty: i.qty, price: i.harga, name: i.nama }))
+            };
+            
+            try {
+                let res = await fetch('api/proses_transaksi.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                let result = await res.json();
+                if (result.success) {
+                    for (let item of keranjang) {
+                        let menuItem = document.querySelector(`.menu-item[data-id="${item.id}"]`);
+                        if (menuItem) {
+                            let stokLama = parseInt(menuItem.dataset.stock);
+                            let stokBaru = stokLama - item.qty;
+                            menuItem.dataset.stock = stokBaru;
+                            let smallTag = menuItem.querySelector('small');
+                            if (smallTag) smallTag.innerHTML = `Stok: ${stokBaru}`;
+                            
+                            let btnSelect = menuItem.querySelector('.btn-select');
+                            if (stokBaru <= 0) {
+                                btnSelect.disabled = true;
+                                btnSelect.innerHTML = 'HABIS';
+                            }
+                        }
+                    }
+                    
+                    alert(metode === 'cash' ? `✅ Pembayaran berhasil! Kembalian: Rp ${(uang - total).toLocaleString('id-ID')}` : '✅ Pembayaran QRIS berhasil!');
+                    showStruk(result.data, metode, uang);
+                    keranjang = [];
+                    renderCart();
+                    document.getElementById('paymentModal').style.display = 'none';
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('❌ Error: ' + result.message);
+                }
+            } catch(e) {
+                alert('❌ Error: ' + e.message);
+            }
+            isProcessing = false;
+        }
+
         function showStruk(data, metode, uang = null) {
             let itemsHtml = '';
             for (let i = 0; i < data.items.length; i++) {
@@ -436,51 +537,6 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                     </div>
                 </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
-        }
-
-        async function prosesPembayaran(metode, uang = null) {
-            if (isProcessing) { alert('Proses sedang berjalan...'); return false; }
-            isProcessing = true;
-            
-            let total = hitungTotal();
-            if (metode === 'cash' && (!uang || uang < total)) {
-                alert('Uang tidak cukup!');
-                isProcessing = false;
-                return false;
-            }
-            
-            let data = {
-                kode_transaksi: document.getElementById('kodeTransaksi').value,
-                id_kasir: parseInt(document.getElementById('kasirId').value),
-                tipe_order: tipeOrder,
-                subtotal: hitungSubtotal(),
-                pajak: hitungPajak(),
-                total: total,
-                metode: metode,
-                items: keranjang.map(i => ({ id: i.id, qty: i.qty, price: i.harga, name: i.nama }))
-            };
-            
-            try {
-                let res = await fetch('api/proses_transaksi.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                let result = await res.json();
-                if (result.success) {
-                    alert(metode === 'cash' ? `✅ Pembayaran berhasil! Kembalian: Rp ${(uang - total).toLocaleString('id-ID')}` : '✅ Pembayaran QRIS berhasil!');
-                    showStruk(result.data, metode, uang);
-                    keranjang = [];
-                    renderCart();
-                    document.getElementById('paymentModal').style.display = 'none';
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    alert('❌ Error: ' + result.message);
-                }
-            } catch(e) {
-                alert('❌ Error: ' + e.message);
-            }
-            isProcessing = false;
         }
 
         document.querySelectorAll('.btn-type').forEach(btn => {

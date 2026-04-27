@@ -25,6 +25,26 @@ $metode = $data['metode'] ?? 'cash';
 $items = $data['items'] ?? [];
 
 try {
+    // 🔴 VALIDASI STOK PERTAMA: Cek semua item sebelum proses
+    $stmtCek = $pdo->prepare("SELECT id, stok, nama_barang FROM menu WHERE id = ?");
+    $stokError = [];
+    
+    foreach ($items as $item) {
+        $stmtCek->execute([$item['id']]);
+        $menu = $stmtCek->fetch();
+        if (!$menu) {
+            throw new Exception("Menu dengan ID {$item['id']} tidak ditemukan");
+        }
+        if ($menu['stok'] < $item['qty']) {
+            $stokError[] = "{$menu['nama_barang']} (stok: {$menu['stok']}, diminta: {$item['qty']})";
+        }
+    }
+    
+    if (!empty($stokError)) {
+        throw new Exception("Stok tidak mencukupi untuk: " . implode(", ", $stokError));
+    }
+    
+    // Jika lolos validasi, mulai transaksi
     $pdo->beginTransaction();
     
     $stmt = $pdo->prepare("INSERT INTO transaksi (kode_transaksi, id_kasir, tipe_order, subtotal, pajak, total, metode_pembayaran) VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -35,8 +55,12 @@ try {
         $stmt = $pdo->prepare("INSERT INTO detail_transaksi (id_transaksi, id_menu, qty, harga_satuan, subtotal) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$id_transaksi, $item['id'], $item['qty'], $item['price'], $item['price'] * $item['qty']]);
         
-        $stmt = $pdo->prepare("UPDATE menu SET stok = stok - ? WHERE id = ?");
-        $stmt->execute([$item['qty'], $item['id']]);
+        $stmt = $pdo->prepare("UPDATE menu SET stok = stok - ? WHERE id = ? AND stok >= ?");
+        $stmt->execute([$item['qty'], $item['id'], $item['qty']]);
+        
+        if ($stmt->rowCount() === 0) {
+            throw new Exception("Gagal update stok untuk item ID {$item['id']}. Stok mungkin tidak cukup.");
+        }
     }
     
     $pdo->commit();
@@ -53,7 +77,9 @@ try {
         ]
     ]);
 } catch (Exception $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
 ?>
