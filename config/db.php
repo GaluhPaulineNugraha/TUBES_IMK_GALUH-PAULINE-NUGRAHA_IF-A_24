@@ -1,4 +1,7 @@
 <?php
+// Set timezone ke Jakarta/WIB
+date_default_timezone_set('Asia/Jakarta');
+
 $host = 'localhost';
 $dbname = 'resto_serba_serbi';
 $username = 'root';

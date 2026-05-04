@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Jakarta');
 require_once 'config/db.php';
 
 if (!isset($_SESSION['kasir_id'])) {
@@ -9,8 +10,29 @@ if (!isset($_SESSION['kasir_id'])) {
 $stmt = $pdo->query("SELECT m.*, k.nama_kategori FROM menu m JOIN kategori k ON m.id_kategori = k.id ORDER BY k.id, m.id");
 $menu = $stmt->fetchAll();
 
-// Generate kode transaksi UNIK
-$kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
+// Generate kode transaksi unik berurutan
+function generateUniqueCode($pdo) {
+    $today = date('dmy');
+    $stmt = $pdo->prepare("SELECT kode_transaksi FROM transaksi WHERE kode_transaksi LIKE CONCAT('TRX', ?, '%') ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$today]);
+    $lastCode = $stmt->fetchColumn();
+    
+    if ($lastCode && substr($lastCode, 3, 6) == $today) {
+        $lastNumber = (int)substr($lastCode, -2);
+        $newNumber = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
+    } else {
+        $newNumber = '01';
+    }
+    
+    return 'TRX' . $today . $newNumber;
+}
+
+do {
+    $kode_transaksi = generateUniqueCode($pdo);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM transaksi WHERE kode_transaksi = ?");
+    $stmt->execute([$kode_transaksi]);
+    $exists = $stmt->fetchColumn();
+} while ($exists > 0);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -26,15 +48,14 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
 
         .app-container { display: flex; height: 100vh; overflow: hidden; }
         .sidebar { width: 280px; background: #2A4B2F; display: flex; flex-direction: column; }
-        .sidebar-header { padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; }
-        .sidebar-header i { font-size: 28px; color: #E8B84B; }
+        .sidebar-header { padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
         .sidebar-header h3 { font-size: 18px; color: #E8B84B; }
         .sidebar-nav { flex: 1; padding: 20px 0; }
         .nav-item { display: flex; align-items: center; gap: 15px; padding: 14px 20px; color: rgba(255,255,255,0.8); text-decoration: none; margin: 5px 10px; border-radius: 12px; }
         .nav-item i { width: 24px; }
         .nav-item:hover { background: rgba(232,184,75,0.2); color: #E8B84B; }
         .nav-item.active { background: #E8B84B; color: #2A4B2F; }
-        .sidebar-footer { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-footer { padding: 20px; }
         .btn-logout { width: 100%; padding: 12px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
         .btn-logout:hover { background: #dc2626; }
 
@@ -110,22 +131,54 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         .btn-pay:hover { background: #E8B84B; color: #2A4B2F; }
         .btn-cancel-pay { flex: 1; padding: 14px; background: #f5f0e8; color: #2A4B2F; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; }
 
-        .confirm-modal { background: white; border-radius: 20px; width: 90%; max-width: 360px; overflow: hidden; }
-        .confirm-header { background: #2A4B2F; padding: 20px; text-align: center; }
-        .confirm-header h3 { color: #E8B84B; }
-        .confirm-body { padding: 30px; text-align: center; }
-        .confirm-footer { padding: 20px; border-top: 1px solid #e0d5c5; display: flex; gap: 12px; }
-        .btn-confirm-yes { flex: 1; padding: 12px; background: #2A4B2F; color: white; border: none; border-radius: 10px; cursor: pointer; }
-        .btn-confirm-no { flex: 1; padding: 12px; background: #f5f0e8; color: #2A4B2F; border: none; border-radius: 10px; cursor: pointer; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
 
-        @media (max-width: 900px) { .kasir-layout { grid-template-columns: 1fr; } .sidebar { width: 80px; } .sidebar-header h3, .nav-item span { display: none; } .nav-item { justify-content: center; } }
+        .custom-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10001;
+            animation: slideIn 0.3s ease;
+        }
+        .custom-notification-content {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 20px;
+            min-width: 280px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 4px solid;
+        }
+        .custom-notification.success .custom-notification-content { border-left-color: #2A4B2F; background: #f0fdf4; }
+        .custom-notification.error .custom-notification-content { border-left-color: #dc2626; background: #fef2f2; }
+        .custom-notification.warning .custom-notification-content { border-left-color: #f59e0b; background: #fffbeb; }
+        .notif-text { flex: 1; }
+        .notif-title { font-weight: 700; margin-bottom: 2px; font-size: 13px; }
+        .notif-message { font-size: 11px; color: #6b7280; }
+        .notif-close { background: none; border: none; cursor: pointer; font-size: 12px; }
+
+        @media (max-width: 900px) { 
+            .kasir-layout { grid-template-columns: 1fr; } 
+            .sidebar { width: 80px; } 
+            .sidebar-header h3, .nav-item span { display: none; } 
+            .nav-item { justify-content: center; } 
+        }
     </style>
 </head>
 <body>
     <div class="app-container">
-         <aside class="sidebar">
-            <div class="sidebar-header" style="justify-content: center;">
-                <h3 style="text-align: center; width: 100%;">Resto Serba Serbi</h3>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3>Resto Serba Serbi</h3>
             </div>
             <nav class="sidebar-nav">
                 <a href="analisis.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
@@ -175,13 +228,13 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                         <h3>LIST MENU</h3>
                         <div class="menu-search">
                             <button class="btn-category active" data-cat="all">SEMUA</button>
-                            <button class="btn-category" data-cat="nasi">ANEKA NASI</button>
-                            <button class="btn-category" data-cat="lauk">ANEKA LAUK PAUK</button>
-                            <button class="btn-category" data-cat="pepes">ANEKA PEPES</button>
-                            <button class="btn-category" data-cat="minuman">ANEKA MINUMAN</button>
-                            <button class="btn-category" data-cat="sayuran">ANEKA SAYURAN</button>
-                            <button class="btn-category" data-cat="camilan">ANEKA CAMILAN</button>
-                            <div class="search-box"><i class="fas fa-search"></i><input type="text" id="searchMenu" placeholder="Cari Disini"></div>
+                            <button class="btn-category" data-cat="nasi">NASI</button>
+                            <button class="btn-category" data-cat="lauk">LAUK</button>
+                            <button class="btn-category" data-cat="pepes">PEPES</button>
+                            <button class="btn-category" data-cat="minuman">MINUMAN</button>
+                            <button class="btn-category" data-cat="sayuran">SAYURAN</button>
+                            <button class="btn-category" data-cat="camilan">CAMILAN</button>
+                            <div class="search-box"><i class="fas fa-search"></i><input type="text" id="searchMenu" placeholder="Cari menu..."></div>
                         </div>
                     </div>
                     <div class="menu-list" id="menuList">
@@ -196,7 +249,7 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                         <div class="menu-item" data-id="<?= $item['id'] ?>" data-name="<?= htmlspecialchars($item['nama_barang']) ?>" data-price="<?= $item['harga'] ?>" data-stock="<?= $item['stok'] ?>">
                             <div class="menu-info">
                                 <h4><?= htmlspecialchars($item['nama_barang']) ?></h4>
-                                <p>Rp <?= number_format($item['harga'], 0, ',', '.') ?>,00</p>
+                                <p>Rp <?= number_format($item['harga'], 0, ',', '.') ?></p>
                                 <small>Stok: <?= $item['stok'] ?></small>
                             </div>
                             <button class="btn-select" onclick="tambahKeKeranjang(this)" <?= $item['stok'] <= 0 ? 'disabled' : '' ?>>
@@ -219,20 +272,20 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                     <div class="amount" id="modalTotal">Rp 0</div>
                 </div>
                 <div class="payment-methods">
-                    <button class="pay-method active" data-method="cash" id="cashMethod"><i class="fas fa-money-bill-wave"></i> CASH</button>
-                    <button class="pay-method" data-method="qris" id="qrisMethod"><i class="fas fa-qrcode"></i> QRIS</button>
+                    <button class="pay-method active" data-method="cash"><i class="fas fa-money-bill-wave"></i> CASH</button>
+                    <button class="pay-method" data-method="qris"><i class="fas fa-qrcode"></i> QRIS</button>
                 </div>
                 <div id="cashSection">
-                    <div class="cash-input"><label><i class="fas fa-coins"></i> Jumlah Uang</label><input type="number" id="jumlahUang" placeholder="Masukkan nominal uang"></div>
+                    <div class="cash-input"><label>Jumlah Uang</label><input type="number" id="jumlahUang" placeholder="Masukkan nominal uang"></div>
                     <div id="kembalianBox" class="kembalian-box"><div class="label">Kembalian</div><div class="amount" id="kembalian">Rp 0</div></div>
                 </div>
                 <div id="qrisSection" style="display:none;">
-                    <div class="qris-box"><i class="fas fa-qrcode"></i><p>Scan QR Code untuk pembayaran</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=RestoSerbaSerbi" alt="QR Code" style="width:150px; margin:10px auto;"></div>
+                    <div class="qris-box"><i class="fas fa-qrcode"></i><p>Scan QR Code untuk pembayaran</p></div>
                 </div>
             </div>
             <div class="payment-footer">
-                <button id="confirmPayment" class="btn-pay"><i class="fas fa-check-circle"></i> BAYAR</button>
-                <button id="cancelPayment" class="btn-cancel-pay"><i class="fas fa-times-circle"></i> BATAL</button>
+                <button id="confirmPayment" class="btn-pay">BAYAR</button>
+                <button id="cancelPayment" class="btn-cancel-pay">BATAL</button>
             </div>
         </div>
     </div>
@@ -256,46 +309,65 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
             'Aneka Camilan': 'camilan'
         };
 
+        function formatRupiah(angka) {
+            return 'Rp ' + angka.toLocaleString('id-ID');
+        }
+
+        function showNotif(title, message, type) {
+            let old = document.querySelector('.custom-notification');
+            if(old) old.remove();
+            let notif = document.createElement('div');
+            notif.className = 'custom-notification ' + type;
+            notif.innerHTML = '<div class="custom-notification-content"><div class="notif-text"><div class="notif-title">' + title + '</div><div class="notif-message">' + message + '</div></div><button class="notif-close" onclick="this.closest(\'.custom-notification\').remove()"><i class="fas fa-times"></i></button></div>';
+            document.body.appendChild(notif);
+            setTimeout(() => { if(notif) notif.remove(); }, 1000);
+        }
+
+        function showStruk(data, metode, uang) {
+            let items = '';
+            for(let item of data.items) {
+                items += '<tr><td style="padding:4px 0;">' + item.name + '</td><td style="text-align:center;">' + item.qty + '</td><td style="text-align:right;">' + formatRupiah(item.price) + '</td><td style="text-align:right;">' + formatRupiah(item.price * item.qty) + '</td></tr>';
+            }
+            let kembalian = uang ? uang - data.total : null;
+            let html = '<div id="strukPrint" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;"><div style="background:white;width:320px;padding:16px;font-family:monospace;font-size:12px;"><div style="text-align:center;"><b>RESTO SERBA SERBI</b><br>Jl. Hos Cokroaminoto Gg Nangka, Cianjur<br>Telp: (0263) 123456<hr>' + data.tanggal + '<br>Kasir: <?= $_SESSION['kasir_nama'] ?><br>Metode: ' + metode.toUpperCase() + '<br><b>Kode: ' + data.kode_transaksi + '</b><hr></div><table style="width:100%;"><thead><tr><th>Item</th><th>Qty</th><th>Harga</th><th>Total</th></tr></thead><tbody>' + items + '</tbody></table><hr><div>Subtotal: ' + formatRupiah(data.subtotal) + (data.pajak > 0 ? '<br>Pajak (5%): ' + formatRupiah(data.pajak) : '') + '<hr><b>Total: ' + formatRupiah(data.total) + '</b>' + (kembalian !== null ? '<hr>Tunai: ' + formatRupiah(uang) + '<br>Kembalian: ' + formatRupiah(kembalian) : '') + '</div><hr><div style="text-align:center;">Terima Kasih<br>Silahkan Datang Kembali</div><div style="display:flex;gap:10px;margin-top:16px;justify-content:center;"><button onclick="printStruk()" style="padding:6px 12px;background:#2A4B2F;color:white;border:none;">CETAK</button><button onclick="closeStruk()" style="padding:6px 12px;background:#E8B84B;color:#2A4B2F;border:none;">TUTUP</button></div></div></div>';
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function printStruk() {
+            let content = document.querySelector('#strukPrint > div');
+            let win = window.open('', '_blank');
+            win.document.write('<html><head><title>Struk</title><style>body{font-family:monospace;padding:20px;}button{display:none;}</style></head><body>' + content.outerHTML + '</body></html>');
+            win.document.close();
+            win.print();
+            win.close();
+        }
+
+        function closeStruk() { let el = document.getElementById('strukPrint'); if(el) el.remove(); }
+
         function tambahKeKeranjang(btn) {
-            if (btn.disabled) {
-                alert('Menu ini sedang habis!');
-                return;
-            }
-            
+            if(btn.disabled) { showNotif('Stok Habis', 'Menu ini habis!', 'warning'); return; }
             let item = btn.closest('.menu-item');
-            let id = parseInt(item.dataset.id);
-            let nama = item.dataset.name;
-            let harga = parseInt(item.dataset.price);
-            let stok = parseInt(item.dataset.stock);
-            
-            // CEK STOK SAAT INI
-            if (stok <= 0) {
-                alert(`Maaf, ${nama} sedang HABIS!`);
-                btn.disabled = true;
-                btn.innerHTML = 'HABIS';
-                return;
-            }
-            
+            let id = parseInt(item.dataset.id), nama = item.dataset.name, harga = parseInt(item.dataset.price), stok = parseInt(item.dataset.stock);
+            if(stok <= 0) { showNotif('Stok Habis', 'Maaf, ' + nama + ' habis!', 'warning'); btn.disabled = true; btn.innerHTML = 'HABIS'; return; }
             let existing = keranjang.find(i => i.id === id);
-            if (existing) {
-                if (existing.qty + 1 > stok) { 
-                    alert(`Stok ${nama} tidak mencukupi! Tersisa ${stok}`);
-                    return; 
-                }
+            if(existing) {
+                if(existing.qty + 1 > stok) { showNotif('Stok Tidak Cukup', 'Stok ' + nama + ' tersisa ' + stok, 'warning'); return; }
                 existing.qty++;
+                showNotif('Berhasil', nama + ' +1', 'success');
             } else {
-                keranjang.push({ id, nama, harga, qty: 1 });
+                keranjang.push({id, nama, harga, qty: 1});
+                showNotif('Ditambahkan', nama + ' ditambahkan', 'success');
             }
             renderCart();
         }
 
-        function hitungSubtotal() { return keranjang.reduce((s, i) => s + (i.harga * i.qty), 0); }
+        function hitungSubtotal() { return keranjang.reduce((s,i) => s + (i.harga * i.qty), 0); }
         function hitungPajak() { return tipeOrder === 'dinein' ? Math.round(hitungSubtotal() * 0.05) : 0; }
         function hitungTotal() { return hitungSubtotal() + hitungPajak(); }
 
         function renderCart() {
             let tbody = document.getElementById('cartItems');
-            if (keranjang.length === 0) {
+            if(keranjang.length === 0) {
                 tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Belum ada pesanan</td></tr>';
                 document.getElementById('subtotal').innerHTML = 'Rp 0';
                 document.getElementById('taxAmount').innerHTML = 'Rp 0';
@@ -304,48 +376,31 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                 document.getElementById('taxRow').style.display = tipeOrder === 'dinein' ? 'flex' : 'none';
                 return;
             }
-            
             let html = '';
-            for (let i = 0; i < keranjang.length; i++) {
-                let item = keranjang[i];
-                html += `<tr>
-                     <td>${item.nama}</td>
-                    <td style="text-align: center;">
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                            <button onclick="ubahQty(${item.id}, -1)" style="width: 30px; height: 30px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer;">-</button>
-                            <span style="min-width: 30px;">${item.qty}</span>
-                            <button onclick="ubahQty(${item.id}, 1)" style="width: 30px; height: 30px; background: #2A4B2F; color: white; border: none; border-radius: 6px; cursor: pointer;">+</button>
-                        </div>
-                    </td>
-                    <td>Rp ${item.harga.toLocaleString('id-ID')},00</td>
-                    <td>Rp ${(item.harga * item.qty).toLocaleString('id-ID')},00</td>
-                    <td><button onclick="hapusItem(${item.id})" style="background: none; border: none; color: #dc2626; cursor: pointer; font-size: 16px;"><i class="fas fa-trash"></i></button></td>
-                </tr>`;
+            for(let item of keranjang) {
+                html += '<tr><td>' + item.nama + '</td><td style="text-align:center;"><button onclick="ubahQty(' + item.id + ',-1)" style="background:#dc2626;color:white;border:none;width:28px;border-radius:6px;">-</button> ' + item.qty + ' <button onclick="ubahQty(' + item.id + ',1)" style="background:#2A4B2F;color:white;border:none;width:28px;border-radius:6px;">+</button></td><td>' + formatRupiah(item.harga) + '</td><td>' + formatRupiah(item.harga * item.qty) + '</td><td><button onclick="hapusItem(' + item.id + ')" style="background:none;border:none;color:#dc2626;"><i class="fas fa-trash"></i></button></td></tr>';
             }
             tbody.innerHTML = html;
-            
-            let subtotal = hitungSubtotal();
-            let pajak = hitungPajak();
-            let total = hitungTotal();
-            document.getElementById('subtotal').innerHTML = `Rp ${subtotal.toLocaleString('id-ID')},00`;
-            document.getElementById('taxAmount').innerHTML = `Rp ${pajak.toLocaleString('id-ID')},00`;
-            document.getElementById('cartTotal').innerHTML = `Rp ${total.toLocaleString('id-ID')},00`;
+            let subtotal = hitungSubtotal(), pajak = hitungPajak(), total = hitungTotal();
+            document.getElementById('subtotal').innerHTML = formatRupiah(subtotal);
+            document.getElementById('taxAmount').innerHTML = formatRupiah(pajak);
+            document.getElementById('cartTotal').innerHTML = formatRupiah(total);
             document.getElementById('bayarBtn').disabled = false;
             document.getElementById('taxRow').style.display = tipeOrder === 'dinein' ? 'flex' : 'none';
         }
 
         function ubahQty(id, change) {
             let index = keranjang.findIndex(i => i.id === id);
-            if (index === -1) return;
+            if(index === -1) return;
             let item = keranjang[index];
-            let menuItem = document.querySelector(`.menu-item[data-id="${id}"]`);
+            let menuItem = document.querySelector('.menu-item[data-id="' + id + '"]');
             let maxStock = menuItem ? parseInt(menuItem.dataset.stock) : 999;
-            
             let newQty = item.qty + change;
-            if (newQty <= 0) {
-                keranjang.splice(index, 1);
-            } else if (newQty > maxStock) {
-                alert(`Stok tidak cukup! Tersisa ${maxStock}`);
+            if(newQty <= 0) {
+                keranjang.splice(index,1);
+                showNotif('Dihapus', item.nama + ' dihapus', 'warning');
+            } else if(newQty > maxStock) {
+                showNotif('Stok Tidak Cukup', 'Stok ' + item.nama + ' tersisa ' + maxStock, 'warning');
                 return;
             } else {
                 item.qty = newQty;
@@ -354,17 +409,20 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         }
 
         function hapusItem(id) {
-            if (confirm('Hapus menu ini?')) {
+            let item = keranjang.find(i => i.id === id);
+            if(item) {
                 keranjang = keranjang.filter(i => i.id !== id);
                 renderCart();
+                showNotif('Dihapus', item.nama + ' dihapus', 'warning');
             }
         }
 
         function batalkanSemua() {
-            if (keranjang.length === 0) return;
-            if (confirm('Batalkan semua pesanan?')) {
+            if(keranjang.length === 0) return;
+            if(confirm('Batalkan semua pesanan?')) {
                 keranjang = [];
                 renderCart();
+                showNotif('Dibatalkan', 'Semua pesanan dibatalkan', 'warning');
             }
         }
 
@@ -373,9 +431,7 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
             items.forEach(item => {
                 let nama = item.dataset.name.toLowerCase();
                 let kategoriHeader = item.previousElementSibling;
-                while (kategoriHeader && !kategoriHeader.classList.contains('menu-kategori')) {
-                    kategoriHeader = kategoriHeader.previousElementSibling;
-                }
+                while(kategoriHeader && !kategoriHeader.classList.contains('menu-kategori')) kategoriHeader = kategoriHeader.previousElementSibling;
                 let kategoriNama = kategoriHeader ? kategoriHeader.innerText : '';
                 let kategoriValue = mapKategori[kategoriNama] || 'all';
                 let matchKategori = kategoriAktif === 'all' || kategoriValue === kategoriAktif;
@@ -383,10 +439,9 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                 item.style.display = matchKategori && matchCari ? 'flex' : 'none';
             });
             document.querySelectorAll('.menu-kategori').forEach(div => {
-                let next = div.nextElementSibling;
-                let ada = false;
-                while (next && next.classList.contains('menu-item')) {
-                    if (next.style.display !== 'none') { ada = true; break; }
+                let next = div.nextElementSibling, ada = false;
+                while(next && next.classList.contains('menu-item')) {
+                    if(next.style.display !== 'none') { ada = true; break; }
                     next = next.nextElementSibling;
                 }
                 div.style.display = ada ? 'block' : 'none';
@@ -394,57 +449,33 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         }
 
         function showPaymentModal() {
-            if (keranjang.length === 0) { alert('Belum ada pesanan!'); return; }
+            if(keranjang.length === 0) { showNotif('Keranjang Kosong', 'Belum ada pesanan!', 'warning'); return; }
             document.getElementById('paymentModal').style.display = 'flex';
-            document.getElementById('modalTotal').innerHTML = `Rp ${hitungTotal().toLocaleString('id-ID')},00`;
+            document.getElementById('modalTotal').innerHTML = formatRupiah(hitungTotal());
             document.getElementById('jumlahUang').value = '';
             document.getElementById('kembalian').innerHTML = 'Rp 0';
             document.getElementById('kembalianBox').classList.remove('error');
         }
 
-        // ✅ FUNGSI CEK STOK SEBELUM BAYAR (FIX BUG)
-        async function prosesPembayaran(metode, uang = null) {
-            if (isProcessing) { alert('Proses sedang berjalan...'); return false; }
-            
-            // 🔴 CEK STOK ULANG SEBELUM PROSES PEMBAYARAN
+        async function prosesPembayaran(metode, uang) {
+            if(isProcessing) return;
             let cekStokGagal = [];
-            for (let item of keranjang) {
-                let menuItem = document.querySelector(`.menu-item[data-id="${item.id}"]`);
+            for(let item of keranjang) {
+                let menuItem = document.querySelector('.menu-item[data-id="' + item.id + '"]');
                 let stokTersedia = menuItem ? parseInt(menuItem.dataset.stock) : 0;
-                
-                if (item.qty > stokTersedia) {
-                    cekStokGagal.push({
-                        nama: item.nama,
-                        qtyDiminta: item.qty,
-                        stokTersedia: stokTersedia
-                    });
-                }
+                if(item.qty > stokTersedia) cekStokGagal.push(item.nama);
             }
-            
-            if (cekStokGagal.length > 0) {
-                let pesanError = "❌ Stok tidak mencukupi untuk item berikut:\n";
-                for (let item of cekStokGagal) {
-                    pesanError += `\n• ${item.nama}: butuh ${item.qty}, tersisa ${item.stokTersedia}`;
-                }
-                pesanError += "\n\nSilakan update keranjang Anda.";
-                alert(pesanError);
-                
-                for (let item of cekStokGagal) {
-                    keranjang = keranjang.filter(i => i.id !== item.id);
-                }
-                renderCart();
-                return false;
+            if(cekStokGagal.length > 0) {
+                showNotif('Stok Tidak Cukup', cekStokGagal.join(', ') + ' stok tidak mencukupi!', 'error');
+                return;
             }
-            
             isProcessing = true;
-            
             let total = hitungTotal();
-            if (metode === 'cash' && (!uang || uang < total)) {
-                alert('Uang tidak cukup!');
+            if(metode === 'cash' && uang < total) {
+                showNotif('Pembayaran Gagal', 'Uang tidak cukup!', 'error');
                 isProcessing = false;
-                return false;
+                return;
             }
-            
             let data = {
                 kode_transaksi: document.getElementById('kodeTransaksi').value,
                 id_kasir: parseInt(document.getElementById('kasirId').value),
@@ -453,92 +484,42 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
                 pajak: hitungPajak(),
                 total: total,
                 metode: metode,
-                items: keranjang.map(i => ({ id: i.id, qty: i.qty, price: i.harga, name: i.nama }))
+                items: keranjang.map(i => ({id: i.id, qty: i.qty, price: i.harga, name: i.nama}))
             };
-            
             try {
-                let res = await fetch('api/proses_transaksi.php', {
+                let res = await fetch('api/proses_transaksi.php',  {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data)
                 });
                 let result = await res.json();
-                if (result.success) {
-                    for (let item of keranjang) {
-                        let menuItem = document.querySelector(`.menu-item[data-id="${item.id}"]`);
-                        if (menuItem) {
-                            let stokLama = parseInt(menuItem.dataset.stock);
-                            let stokBaru = stokLama - item.qty;
+                if(result.success) {
+                    for(let item of keranjang) {
+                        let menuItem = document.querySelector('.menu-item[data-id="' + item.id + '"]');
+                        if(menuItem) {
+                            let stokBaru = parseInt(menuItem.dataset.stock) - item.qty;
                             menuItem.dataset.stock = stokBaru;
-                            let smallTag = menuItem.querySelector('small');
-                            if (smallTag) smallTag.innerHTML = `Stok: ${stokBaru}`;
-                            
-                            let btnSelect = menuItem.querySelector('.btn-select');
-                            if (stokBaru <= 0) {
-                                btnSelect.disabled = true;
-                                btnSelect.innerHTML = 'HABIS';
-                            }
+                            let small = menuItem.querySelector('small');
+                            if(small) small.innerHTML = 'Stok: ' + stokBaru;
+                            let btn = menuItem.querySelector('.btn-select');
+                            if(stokBaru <= 0) { btn.disabled = true; btn.innerHTML = 'HABIS'; }
                         }
                     }
-                    
-                    alert(metode === 'cash' ? `✅ Pembayaran berhasil! Kembalian: Rp ${(uang - total).toLocaleString('id-ID')}` : '✅ Pembayaran QRIS berhasil!');
+                    showNotif('Berhasil', metode === 'cash' ? 'Kembalian: ' + formatRupiah(uang - total) : 'Pembayaran QRIS berhasil', 'success');
                     showStruk(result.data, metode, uang);
                     keranjang = [];
                     renderCart();
                     document.getElementById('paymentModal').style.display = 'none';
-                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    alert('❌ Error: ' + result.message);
+                    showNotif('Gagal', result.message, 'error');
                 }
             } catch(e) {
-                alert('❌ Error: ' + e.message);
+                showNotif('Error', e.message, 'error');
             }
             isProcessing = false;
         }
 
-        function showStruk(data, metode, uang = null) {
-            let itemsHtml = '';
-            for (let i = 0; i < data.items.length; i++) {
-                let item = data.items[i];
-                itemsHtml += `<tr><td style="padding:5px;">${item.name}</td><td style="padding:5px;text-align:center;">${item.qty}</td><td style="padding:5px;text-align:right;">Rp ${item.price.toLocaleString('id-ID')}</td><td style="padding:5px;text-align:right;">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</td></tr>`;
-            }
-            let kembalian = uang ? uang - data.total : null;
-            let html = `
-                <div id="strukPrint" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center;">
-                    <div style="background:white; width:380px; border-radius:10px; padding:20px; font-family:monospace;">
-                        <div style="text-align:center;">
-                            <h3 style="color:#2A4B2F;">Resto Serba Serbi</h3>
-                            <p>Jl. Hos Cokroaminoto Gg Nangka, Cianjur</p>
-                            <hr>
-                            <p>${data.tanggal}</p>
-                            <p>Kasir: <?= $_SESSION['kasir_nama'] ?></p>
-                            <p>Metode: ${metode.toUpperCase()}</p>
-                            <p>Kode: ${data.kode_transaksi}</p>
-                            <hr>
-                        </div>
-                        <table style="width:100%;">
-                            <thead><tr><th>Nama</th><th>Qty</th><th>Harga</th><th>Subtotal</th></tr></thead>
-                            <tbody>${itemsHtml}</tbody>
-                            <tfoot>
-                                <tr><td colspan="3"><strong>Subtotal:</strong></td><td>Rp ${data.subtotal.toLocaleString('id-ID')}</td></tr>
-                                <tr><td colspan="3"><strong>Pajak 5%:</strong></td><td>Rp ${data.pajak.toLocaleString('id-ID')}</td></tr>
-                                <tr><td colspan="3"><strong>TOTAL:</strong></td><td><strong>Rp ${data.total.toLocaleString('id-ID')}</strong></td></tr>
-                                ${kembalian !== null ? `<tr><td colspan="3">Tunai:</td><td>Rp ${uang.toLocaleString('id-ID')}</td></tr>
-                                <tr><td colspan="3">Kembalian:</td><td>Rp ${kembalian.toLocaleString('id-ID')}</td></tr>` : ''}
-                            </tfoot>
-                        </table>
-                        <hr>
-                        <div style="text-align:center;">
-                            <p>Terima Kasih</p>
-                            <p>Silahkan Datang Kembali</p>
-                            <button onclick="window.print()" style="margin:10px; padding:8px 20px; background:#2A4B2F; color:white; border:none; border-radius:5px; cursor:pointer;">CETAK STRUK</button>
-                            <button onclick="this.closest('#strukPrint').remove()" style="margin:10px; padding:8px 20px; background:#E8B84B; color:#2A4B2F; border:none; border-radius:5px; cursor:pointer;">TUTUP</button>
-                        </div>
-                    </div>
-                </div>`;
-            document.body.insertAdjacentHTML('beforeend', html);
-        }
-
+        // Event Listeners
         document.querySelectorAll('.btn-type').forEach(btn => {
             btn.onclick = function() {
                 document.querySelectorAll('.btn-type').forEach(b => b.classList.remove('active'));
@@ -560,23 +541,18 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
         document.getElementById('searchMenu').oninput = function(e) { kataCari = e.target.value.toLowerCase(); filterMenu(); };
         document.getElementById('bayarBtn').onclick = showPaymentModal;
         document.getElementById('batalkanPesananBtn').onclick = batalkanSemua;
+        document.getElementById('cancelPayment').onclick = () => document.getElementById('paymentModal').style.display = 'none';
+        window.onclick = function(e) { if(e.target === document.getElementById('paymentModal')) document.getElementById('paymentModal').style.display = 'none'; };
 
-        let paymentModal = document.getElementById('paymentModal');
-        document.getElementById('cancelPayment').onclick = () => paymentModal.style.display = 'none';
-        window.onclick = function(event) { if (event.target === paymentModal) paymentModal.style.display = 'none'; };
-
-        document.getElementById('cashMethod').onclick = function() {
-            this.classList.add('active');
-            document.getElementById('qrisMethod').classList.remove('active');
-            document.getElementById('cashSection').style.display = 'block';
-            document.getElementById('qrisSection').style.display = 'none';
-        };
-        document.getElementById('qrisMethod').onclick = function() {
-            this.classList.add('active');
-            document.getElementById('cashMethod').classList.remove('active');
-            document.getElementById('cashSection').style.display = 'none';
-            document.getElementById('qrisSection').style.display = 'block';
-        };
+        document.querySelectorAll('.pay-method').forEach(btn => {
+            btn.onclick = function() {
+                document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                let method = this.dataset.method;
+                document.getElementById('cashSection').style.display = method === 'cash' ? 'block' : 'none';
+                document.getElementById('qrisSection').style.display = method === 'qris' ? 'block' : 'none';
+            };
+        });
 
         document.getElementById('jumlahUang').oninput = function() {
             let total = hitungTotal();
@@ -584,29 +560,30 @@ $kode_transaksi = 'TRX' . date('Ymd') . substr(time(), -6) . rand(10, 99);
             let kembalian = uang - total;
             let span = document.getElementById('kembalian');
             let box = document.getElementById('kembalianBox');
-            if (kembalian < 0) {
+            if(kembalian < 0) {
                 span.innerHTML = 'Uang Tidak Cukup';
                 box.classList.add('error');
             } else {
-                span.innerHTML = `Rp ${kembalian.toLocaleString('id-ID')},00`;
+                span.innerHTML = formatRupiah(kembalian);
                 box.classList.remove('error');
             }
         };
 
         document.getElementById('confirmPayment').onclick = function() {
             let activeMethod = document.querySelector('.pay-method.active').dataset.method;
-            if (activeMethod === 'cash') {
+            if(activeMethod === 'cash') {
                 let total = hitungTotal();
                 let uang = parseInt(document.getElementById('jumlahUang').value) || 0;
-                if (uang >= total) prosesPembayaran('cash', uang);
-                else alert('Uang tidak cukup!');
+                if(uang >= total) prosesPembayaran('cash', uang);
+                else showNotif('Uang Kurang', 'Uang tidak cukup!', 'error');
             } else {
-                prosesPembayaran('qris');
+                prosesPembayaran('qris', null);
             }
         };
 
         filterMenu();
-        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' });
+        let now = new Date();
+        document.getElementById('currentDate').innerHTML = now.toLocaleDateString('id-ID', {weekday:'long', year:'numeric', month:'numeric', day:'numeric'}) + ' ' + now.toLocaleTimeString('id-ID');
     </script>
 </body>
 </html>
