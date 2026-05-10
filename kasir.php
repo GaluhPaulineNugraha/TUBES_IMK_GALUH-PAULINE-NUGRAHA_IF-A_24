@@ -47,17 +47,79 @@ do {
         body { font-family: 'Inter', sans-serif; background: #f5f0e8; }
 
         .app-container { display: flex; height: 100vh; overflow: hidden; }
-        .sidebar { width: 280px; background: #2A4B2F; display: flex; flex-direction: column; }
-        .sidebar-header { padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
-        .sidebar-header h3 { font-size: 18px; color: #E8B84B; }
-        .sidebar-nav { flex: 1; padding: 20px 0; }
-        .nav-item { display: flex; align-items: center; gap: 15px; padding: 14px 20px; color: rgba(255,255,255,0.8); text-decoration: none; margin: 5px 10px; border-radius: 12px; }
-        .nav-item i { width: 24px; }
-        .nav-item:hover { background: rgba(232,184,75,0.2); color: #E8B84B; }
-        .nav-item.active { background: #E8B84B; color: #2A4B2F; }
-        .sidebar-footer { padding: 20px; }
-        .btn-logout { width: 100%; padding: 12px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
-        .btn-logout:hover { background: #dc2626; }
+        
+        /* SIDEBAR KOTAK (SEPERTI SEMULA) */
+        .sidebar { 
+            width: 280px; 
+            background: #2A4B2F; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        
+        .sidebar-header { 
+            padding: 25px 20px; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            text-align: center; 
+        }
+        
+        .sidebar-header h3 { 
+            font-size: 18px; 
+            color: #E8B84B; 
+        }
+        
+        .sidebar-nav { 
+            flex: 1; 
+            padding: 20px 0; 
+        }
+        
+        .nav-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            padding: 14px 20px; 
+            color: rgba(255,255,255,0.8); 
+            text-decoration: none; 
+            margin: 5px 10px; 
+            border-radius: 12px; 
+        }
+        
+        .nav-item i { 
+            width: 24px; 
+        }
+        
+        .nav-item:hover { 
+            background: rgba(232,184,75,0.2); 
+            color: #E8B84B; 
+        }
+        
+        .nav-item.active { 
+            background: #E8B84B; 
+            color: #2A4B2F; 
+        }
+        
+        .sidebar-footer { 
+            padding: 20px; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+        }
+        
+        .btn-logout { 
+            width: 100%; 
+            padding: 12px; 
+            background: rgba(255,255,255,0.1); 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            text-decoration: none; 
+        }
+        
+        .btn-logout:hover { 
+            background: #dc2626; 
+        }
 
         .main-content { flex: 1; overflow-y: auto; padding: 20px 30px; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #e0d5c5; }
@@ -181,14 +243,17 @@ do {
                 <h3>Resto Serba Serbi</h3>
             </div>
             <nav class="sidebar-nav">
-                <a href="analisis.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
-                <a href="kasir.php" class="nav-item active"><i class="fas fa-cash-register"></i><span>Kasir</span></a>
                 <a href="stok.php" class="nav-item"><i class="fas fa-boxes"></i><span>Lihat Stok</span></a>
+                <a href="kasir.php" class="nav-item active"><i class="fas fa-cash-register"></i><span>Kasir</span></a>
+                <a href="analisis.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
                 <a href="profil.php" class="nav-item"><i class="fas fa-user-circle"></i><span>Profil Kasir</span></a>
             </nav>
             <div class="sidebar-footer">
-                <a href="logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
-            </div>
+    <a href="logout.php" class="btn-logout">
+        <i class="fas fa-sign-out-alt" style="transform: rotate(180deg);"></i>
+        <span>Keluar</span>
+    </a>
+</div>
         </aside>
 
         <main class="main-content">
@@ -487,7 +552,7 @@ do {
                 items: keranjang.map(i => ({id: i.id, qty: i.qty, price: i.harga, name: i.nama}))
             };
             try {
-                let res = await fetch('api/proses_transaksi.php',  {
+                let res = await fetch('api/proses_transaksi.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data)
@@ -582,8 +647,14 @@ do {
         };
 
         filterMenu();
-        let now = new Date();
-        document.getElementById('currentDate').innerHTML = now.toLocaleDateString('id-ID', {weekday:'long', year:'numeric', month:'numeric', day:'numeric'}) + ' ' + now.toLocaleTimeString('id-ID');
+        
+        // UPDATE TANGGAL (HANYA HARI, TANGGAL, BULAN, TAHUN - TANPA JAM/DETIK)
+        function updateDateTime() {
+            let now = new Date();
+            let options = { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' };
+            document.getElementById('currentDate').innerHTML = now.toLocaleDateString('id-ID', options);
+        }
+        updateDateTime();
     </script>
 </body>
 </html>

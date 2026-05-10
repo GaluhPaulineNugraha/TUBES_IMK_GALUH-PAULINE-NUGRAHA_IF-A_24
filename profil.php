@@ -23,15 +23,17 @@ $kasir = $stmt->fetch();
         <h3 style="text-align: center; width: 100%;">Resto Serba Serbi</h3>
     </div>
     <nav class="sidebar-nav">
-                <a href="analisis.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
+                <a href="stok.php" class="nav-item"><i class="fas fa-boxes"></i><span>Lihat Stok</span></a>
                 <a href="kasir.php" class="nav-item"><i class="fas fa-cash-register"></i><span>Kasir</span></a>
-                <a href="stok.php" class="nav-item"><i class="fas fa-boxes"></i><span>Manajemen Stok</span></a>
+                 <a href="analisis.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Analisis Laporan</span></a>
                 <a href="profil.php" class="nav-item active"><i class="fas fa-user-circle"></i><span>Profil Kasir</span></a>
-
-    </nav>
+            </nav>
     <div class="sidebar-footer">
-        <a href="logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
-    </div>
+    <a href="logout.php" class="btn-logout">
+        <i class="fas fa-sign-out-alt" style="transform: rotate(180deg);"></i>
+        <span>Keluar</span>
+    </a>
+</div>
 </aside>
         <main class="main-content">
             <div class="top-bar"><div class="page-title"><h1><i class="fas fa-user-circle"></i> PROFIL KASIR</h1></div><div class="date-time"><i class="far fa-calendar-alt"></i><span id="currentDate"></span></div></div>

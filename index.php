@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['kasir_id'] = $kasir['id'];
         $_SESSION['kasir_nama'] = $kasir['nama'];
         $_SESSION['kasir_username'] = $kasir['username'];
-        header('Location: analisis.php');
+        header('Location: kasir.php');
         exit();
     } else {
         $error = 'Username atau password salah!';
