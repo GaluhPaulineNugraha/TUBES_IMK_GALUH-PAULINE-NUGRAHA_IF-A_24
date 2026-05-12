@@ -249,11 +249,11 @@ do {
                 <a href="profil.php" class="nav-item"><i class="fas fa-user-circle"></i><span>Profil Kasir</span></a>
             </nav>
             <div class="sidebar-footer">
-    <a href="logout.php" class="btn-logout">
-        <i class="fas fa-sign-out-alt" style="transform: rotate(180deg);"></i>
-        <span>Keluar</span>
-    </a>
-</div>
+                <a href="logout.php" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Keluar</span>
+                </a>
+            </div>
         </aside>
 
         <main class="main-content">
@@ -388,16 +388,69 @@ do {
             setTimeout(() => { if(notif) notif.remove(); }, 1000);
         }
 
+        // FUNGSI STRUK - JUDUL RATA KIRI, NOMINAL RATA KANAN
         function showStruk(data, metode, uang) {
             let items = '';
             for(let item of data.items) {
-                items += '<tr><td style="padding:4px 0;">' + item.name + '</td><td style="text-align:center;">' + item.qty + '</td><td style="text-align:right;">' + formatRupiah(item.price) + '</td><td style="text-align:right;">' + formatRupiah(item.price * item.qty) + '</td></tr>';
+                items += '<tr>' +
+                    '<td style="padding:4px 0; text-align:left;">' + item.name + '</td>' +
+                    '<td style="padding:4px 8px; text-align:center;">' + item.qty + '</td>' +
+                    '<td style="padding:4px 0; text-align:right;">' + formatRupiah(item.price) + '</td>' +
+                    '<td style="padding:4px 0; text-align:right;">' + formatRupiah(item.price * item.qty) + '</td>' +
+                '</tr>';
             }
             let kembalian = uang ? uang - data.total : null;
-            let html = '<div id="strukPrint" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;"><div style="background:white;width:320px;padding:16px;font-family:monospace;font-size:12px;"><div style="text-align:center;"><b>RESTO SERBA SERBI</b><br>Jl. Hos Cokroaminoto Gg Nangka, Cianjur<br>Telp: (0263) 123456<hr>' + data.tanggal + '<br>Kasir: <?= $_SESSION['kasir_nama'] ?><br>Metode: ' + metode.toUpperCase() + '<br><b>Kode: ' + data.kode_transaksi + '</b><hr></div><table style="width:100%;"><thead><tr><th>Item</th><th>Qty</th><th>Harga</th><th>Total</th></tr></thead><tbody>' + items + '</tbody></table><hr><div>Subtotal: ' + formatRupiah(data.subtotal) + (data.pajak > 0 ? '<br>Pajak (5%): ' + formatRupiah(data.pajak) : '') + '<hr><b>Total: ' + formatRupiah(data.total) + '</b>' + (kembalian !== null ? '<hr>Tunai: ' + formatRupiah(uang) + '<br>Kembalian: ' + formatRupiah(kembalian) : '') + '</div><hr><div style="text-align:center;">Terima Kasih<br>Silahkan Datang Kembali</div><div style="display:flex;gap:10px;margin-top:16px;justify-content:center;"><button onclick="printStruk()" style="padding:6px 12px;background:#2A4B2F;color:white;border:none;">CETAK</button><button onclick="closeStruk()" style="padding:6px 12px;background:#E8B84B;color:#2A4B2F;border:none;">TUTUP</button></div></div></div>';
+            
+            let html = '<div id="strukPrint" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;">' +
+                '<div style="background:white;width:320px;padding:16px;font-family:monospace;font-size:12px;">' +
+                    '<div style="text-align:center;">' +
+                        '<b>RESTO SERBA SERBI</b><br>' +
+                        'Jl. Hos Cokroaminoto Gg Nangka, Cianjur<br>' +
+                        'Telp: (0263) 123456<hr>' +
+                        data.tanggal + '<br>' +
+                        'Kasir: <?= $_SESSION['kasir_nama'] ?><br>' +
+                        'Metode: ' + metode.toUpperCase() + '<br>' +
+                        '<b>Kode: ' + data.kode_transaksi + '</b><hr>' +
+                    '</div>' +
+                    '<table style="width:100%;">' +
+                        '<thead>' +
+                            '<tr>' +
+                                '<th style="text-align:left;">Item</th>' +
+                                '<th style="text-align:center;">Qty</th>' +
+                                '<th style="text-align:right;">Harga</th>' +
+                                '<th style="text-align:right;">Total</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>' + items + '</tbody>' +
+                    '</table><hr>' +
+                    '<div style="display:flex; justify-content:space-between;">' +
+                        '<span>Subtotal</span>' +
+                        '<span>' + formatRupiah(data.subtotal) + '</span>' +
+                    '</div>' +
+                    (data.pajak > 0 ? '<div style="display:flex; justify-content:space-between;"><span>Pajak (5%)</span><span>' + formatRupiah(data.pajak) + '</span></div>' : '') +
+                    '<div style="border-top:1px solid #000; margin:6px 0;"></div>' +
+                    '<div style="display:flex; justify-content:space-between; font-weight:bold;">' +
+                        '<span>TOTAL</span>' +
+                        '<span>' + formatRupiah(data.total) + '</span>' +
+                    '</div>' +
+                    (kembalian !== null ? 
+                        '<div style="border-top:1px dashed #000; margin:8px 0;"></div>' +
+                        '<div style="display:flex; justify-content:space-between;"><span>Tunai</span><span>' + formatRupiah(uang) + '</span></div>' +
+                        '<div style="display:flex; justify-content:space-between;"><span>Kembalian</span><span>' + formatRupiah(kembalian) + '</span></div>' 
+                    : '') +
+                    '<hr>' +
+                    '<div style="text-align:center;">Terima Kasih<br>Silahkan Datang Kembali</div>' +
+                    '<div style="display:flex;gap:10px;margin-top:16px;justify-content:center;">' +
+                        '<button onclick="printStruk()" style="padding:6px 12px;background:#2A4B2F;color:white;border:none;">CETAK</button>' +
+                        '<button onclick="closeStruk()" style="padding:6px 12px;background:#E8B84B;color:#2A4B2F;border:none;">TUTUP</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+            
             document.body.insertAdjacentHTML('beforeend', html);
         }
 
+        // FUNGSI PRINT STRUK - LANGSUNG TUTUP SETELAH PRINT
         function printStruk() {
             let content = document.querySelector('#strukPrint > div');
             let win = window.open('', '_blank');
@@ -405,6 +458,9 @@ do {
             win.document.close();
             win.print();
             win.close();
+            
+            // Tutup struk otomatis setelah print
+            closeStruk();
         }
 
         function closeStruk() { let el = document.getElementById('strukPrint'); if(el) el.remove(); }
@@ -443,7 +499,13 @@ do {
             }
             let html = '';
             for(let item of keranjang) {
-                html += '<tr><td>' + item.nama + '</td><td style="text-align:center;"><button onclick="ubahQty(' + item.id + ',-1)" style="background:#dc2626;color:white;border:none;width:28px;border-radius:6px;">-</button> ' + item.qty + ' <button onclick="ubahQty(' + item.id + ',1)" style="background:#2A4B2F;color:white;border:none;width:28px;border-radius:6px;">+</button></td><td>' + formatRupiah(item.harga) + '</td><td>' + formatRupiah(item.harga * item.qty) + '</td><td><button onclick="hapusItem(' + item.id + ')" style="background:none;border:none;color:#dc2626;"><i class="fas fa-trash"></i></button></td></tr>';
+                html += '<tr>' +
+                    '<td>' + item.nama + '</td>' +
+                    '<td style="text-align:center;"><button onclick="ubahQty(' + item.id + ',-1)" style="background:#dc2626;color:white;border:none;width:28px;border-radius:6px;">-</button> ' + item.qty + ' <button onclick="ubahQty(' + item.id + ',1)" style="background:#2A4B2F;color:white;border:none;width:28px;border-radius:6px;">+</button></td>' +
+                    '<td>' + formatRupiah(item.harga) + '</td>' +
+                    '<td>' + formatRupiah(item.harga * item.qty) + '</td>' +
+                    '<td><button onclick="hapusItem(' + item.id + ')" style="background:none;border:none;color:#dc2626;"><i class="fas fa-trash"></i></button></td>' +
+                '</tr>';
             }
             tbody.innerHTML = html;
             let subtotal = hitungSubtotal(), pajak = hitungPajak(), total = hitungTotal();
@@ -575,6 +637,7 @@ do {
                     keranjang = [];
                     renderCart();
                     document.getElementById('paymentModal').style.display = 'none';
+                    // TIDAK ADA reload halaman
                 } else {
                     showNotif('Gagal', result.message, 'error');
                 }
